@@ -44,7 +44,7 @@
 <meta property="og:image" content="http://yoursite.com/images/resources1/8A9A5F2B9788AB5AB9822401C33710E4.jpg">
 <meta property="og:image" content="http://yoursite.com/images/resources1/72700B2BCDB2C16974497F6019C6C6B0.jpg">
 <meta property="article:published_time" content="2020-05-12T01:48:31.000Z">
-<meta property="article:modified_time" content="2020-09-03T14:35:59.591Z">
+<meta property="article:modified_time" content="2020-09-06T16:49:13.703Z">
 <meta property="article:author" content="徐亚东">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://yoursite.com/images/resources1/BD52A8A5B1424F1F225B8A0BFA41158A.jpg">
@@ -134,6 +134,11 @@
     <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
 
   </li>
+        <li class="menu-item menu-item-视频">
+
+    <a href="/%E8%A7%86%E9%A2%91/" rel="section"><i class="fa fa-tag fa-fw"></i>视频</a>
+
+  </li>
   </ul>
 </nav>
 
@@ -192,7 +197,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-09-03 22:35:59" itemprop="dateModified" datetime="2020-09-03T22:35:59+08:00">2020-09-03</time>
+                <time title="Modified: 2020-09-07 00:49:13" itemprop="dateModified" datetime="2020-09-07T00:49:13+08:00">2020-09-07</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -233,7 +238,9 @@
 <p>objc_object是含有一个isa_t 类型的成员的结构体</p>
 <p><img src="/images/resources1/6AA5F10E9BBD720874CCDDBA79D815B1.jpg" alt="IMAGE"><br>综上Objective-C中类也是一个对象。在objc_class中，除了isa之外，还有三个成员变量，一个是父类的指针，一个是方法缓存，最后一个是这个类的数据区域。<br>当一个对象的实例方法被调用的时候，会通过isa找到相应的类，先在缓存中查找，没有找到然后然后在该类的class_data_bits_t中查找方法。class_data_bits_t是指向了类对象的数据区域。在该数据区域内查找相应方法的对应实现。但我们在调用类方法的时候，类对象的isa里面是什么呢？这里为了和对象查找方法的机制一致，遂引入了元类（meta-class）的概念。引入元类之后，类对象和对象查找方法的机制就完全统一了。<br>对象的实例方法调用时，通过对象的isa在类中获取方法的实现。<br>类对象的类方法调用时，通过类的isa在元类中获取方法的实现。<br>meta-class之所以重要，是因为它存储着一个类的所有类方法，每个类都会有一个单独的meta-calss，因为每个类的类方法基本不可能完全相同。<br>对应的关系如下图：<br><img src="/images/resources1/7BFCAFA97C11AEB30E7CB587979B8F42.jpg" alt="IMAGE"><br>1，Root class 其实就是NSObject,NSObject是没有超类的，所以Root class的supperclass指向nil.<br>2，每个class的isa指针指向唯一的Meta class.<br>3，Root class(meta)的superclass指向Root class(class),也就是NSObject,形成一个回路。<br>4，每个meta class 的isa指针都指向Root class(meta).<br>我们应该明白，类对象和元类对象是唯一的，对象是可以在运行时创建无数个的。而在main方法执行之前，从dyld到runtime这期间，类对象和元类对象在这期间被创建。</p>
 <p>接下来主要聊聊isa的类型isa_t以及bits的类型class_data_bits_t</p>
-<h2 id="isa-t"><a href="#isa-t" class="headerlink" title="##isa_t"></a>##isa_t</h2><p><img src="/images/resources1/B5A6A2A5C6F9248BA46F8A981D7B1239.jpg" alt="IMAGE"><br>如图可以看到isa_t是联合体，重点是struct结构体里面ISA_BITFIELD这个宏定义，可以看到这个宏定义是在isa.h这个文件里面。<br><img src="/images/resources1/AB5B635BC6506FE842EAA3ED03FD48BC.jpg" alt="IMAGE"><br>从iphone5s开始就是arm64，所以实际上isa_t可以简化为<br><img src="/images/resources1/0236EE01BC9381961C1DCB4DC8D5BAE5.jpg" alt="IMAGE"><br>看到这里可能有人对于struct结构体中成员变量后面的冒号加数字比较疑惑。可以看一下搜索一下位域，简单来讲就是一般数据类型的大小是按字节（byte）,比如在64位系统上char类型是1个字节，int类型是4个字节，而位域可以支持按位分配。比如：<br><img src="/images/resources1/D594944A1E886C801145F2042737C601.jpg" alt="IMAGE"><br>status1占8个字节而status2占4个字节，并且只用了2位来存储数值。<br>了解了位域之后再来看</p>
+<p>##<br>isa_t</p>
+<hr>
+<p><img src="/images/resources1/B5A6A2A5C6F9248BA46F8A981D7B1239.jpg" alt="IMAGE"><br>如图可以看到isa_t是联合体，重点是struct结构体里面ISA_BITFIELD这个宏定义，可以看到这个宏定义是在isa.h这个文件里面。<br><img src="/images/resources1/AB5B635BC6506FE842EAA3ED03FD48BC.jpg" alt="IMAGE"><br>从iphone5s开始就是arm64，所以实际上isa_t可以简化为<br><img src="/images/resources1/0236EE01BC9381961C1DCB4DC8D5BAE5.jpg" alt="IMAGE"><br>看到这里可能有人对于struct结构体中成员变量后面的冒号加数字比较疑惑。可以看一下搜索一下位域，简单来讲就是一般数据类型的大小是按字节（byte）,比如在64位系统上char类型是1个字节，int类型是4个字节，而位域可以支持按位分配。比如：<br><img src="/images/resources1/D594944A1E886C801145F2042737C601.jpg" alt="IMAGE"><br>status1占8个字节而status2占4个字节，并且只用了2位来存储数值。<br>了解了位域之后再来看</p>
 <ul>
 <li>nonpointer 为0表示是isa指针 1则表示是isa结构体</li>
 <li>has_assoc 表示是否有设置过关联对象</li>
@@ -245,7 +252,9 @@
 <li>has_sidetable_rc 引用计数是否过大而存放在sidetable中</li>
 <li>extra_rc 存放引用计数，这里存放的是额为的引用计数，如果引用计数为1则存储的是0，当引用计数大于2^19则需要使用sidetable来存储。</li>
 </ul>
-<h2 id="class-data-bits-t"><a href="#class-data-bits-t" class="headerlink" title="##class_data_bits_t"></a>##class_data_bits_t</h2><p><img src="/images/resources1/E8BFE48C607E23EFC14177457DA2E79A.jpg" alt="IMAGE"><br>只含有一个64位的bits存储与类有关的信息<br>###class_rw_t 和 class_ro_t</p>
+<p>##<br>class_data_bits_t</p>
+<hr>
+<p><img src="/images/resources1/E8BFE48C607E23EFC14177457DA2E79A.jpg" alt="IMAGE"><br>只含有一个64位的bits存储与类有关的信息<br>###<br>class_rw_t 和 class_ro_t</p>
 <hr>
 <p>可以看到class_data_bits_t为我们提供了获取class_rw_t和class_ro_t的方法</p>
 <p><img src="/images/resources1/5200E673BB357EEF77BA908CF1D5EB6C.jpg" alt="IMAGE"></p>
@@ -277,8 +286,8 @@
       <i class="fa fa-chevron-left"></i> alloc流程图
     </a></div>
       <div class="post-nav-item">
-    <a href="/2020/05/12/iOS/Swift%20%E7%B1%BB%E5%92%8C%E7%BB%93%E6%9E%84%E4%BD%93%E7%9A%84%E5%8C%BA%E5%88%AB/" rel="next" title="Swift Class和Struct的区别">
-      Swift Class和Struct的区别 <i class="fa fa-chevron-right"></i>
+    <a href="/2020/05/12/iOS/SwiftUI/" rel="next" title="SwiftUI LengthConversion">
+      SwiftUI LengthConversion <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -338,7 +347,6 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#isa-t"><span class="nav-number">1.</span> <span class="nav-text">##isa_t</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#class-data-bits-t"><span class="nav-number">2.</span> <span class="nav-text">##class_data_bits_t</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
