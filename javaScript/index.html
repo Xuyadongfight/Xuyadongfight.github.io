@@ -1,20 +1,33 @@
-
-<!DOCTYPE html>
 <html>
+    <script>
+        function on(){
+            document.getElementById("title").innerHTML="";
+        }
+        function out(){
+            document.getElementById("title").innerHTML="我的作品集";
+        }
+        </script>
 <head>
-<meta charset="utf-8">
-<title>这是今天的作业</title>
+    <meta charset="utf-8">
+    <title>我的作品集</title>
 </head>
+<div id="para1">
+    <h1 id = "title">我的作品集</h1>
+    <embed src="source/作品集.pdf" type="application/pdf" width="80%" height="100%" onmousemove="on()" onmouseout="out()">
+</div>
+
 <body>
-<h1>我的第一个javaScript</h1>
-<img id="image" src="source/1.png" alt="" >
-<p id = "demo">JavaScript 可以触发事件，就像按钮点击。</p>
-<script>
-function myFunc(){
-    document.getElementById("demo").innerHTML="hello 😁😁😁😁😁😁";
-    document.getElementById("image").src="source/loading_zx.gif"
-}
-</script>
-<button type="button" onclick="myFunc()">点我一下</button>
 </body>
+<style>
+    h1 {
+        color: orange;
+        text-align: center;
+
+    }
+
+    #para1 {
+        text-align: center;
+    }
+</style>
+
 </html>
