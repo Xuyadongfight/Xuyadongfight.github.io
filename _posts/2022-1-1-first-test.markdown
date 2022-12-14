@@ -4,7 +4,7 @@ title:  "内存对齐"
 date:   2022-1-1 18:50:58 +0800
 categories: basic
 ---
-
+![IMAGE](/assets/images/test.png)
 # 1.什么是内存对齐？
 只针对聚合类型的数据。比如结构体，联合体，类。这里采用结构体来说明。
 想象中结构体中的内存是每个字节都存储的有数据，即是每个存储在内存中的数据都是紧挨着的。但实际上一般情况并不是紧挨着存储的。这种采用一定规则排序内存的方式叫做内存对齐。
@@ -121,5 +121,5 @@ void * realloc(void * p,int n);
 ![IMAGE](quiver-image-url/34C0DF14C46E87B441F533E3B3ECB407.jpg =1885x132)
 申请一块内存的起始地址在32位机器上是8字节对齐即起始地址为8的倍数即0xnnnnnnn0或者0xnnnnnnn8。其中n为0到F的取值。同理在64位机器上是16字节对齐。即起始地址为16的倍数即地址为0xnnnnnnnnnnnnnnn0。
 
-![IMAGE](test.png =1885x132)
+![IMAGE](https://github.com/Xuyadongfight/Xuyadongfight.github.io/blob/master/_pictures/test.png)
 
