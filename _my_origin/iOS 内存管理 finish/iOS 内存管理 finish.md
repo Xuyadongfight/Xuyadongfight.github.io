@@ -1,0 +1,215 @@
+### 内存管理就是我们申请的内存当不需要使用的时候需要释放掉。否则有限的内存很快就会被消耗一空。内存分为代码区，常量区，全局区，堆区，栈区五大区。只有堆内存需要我们管理。
+
+### C语言中的内存管理
+```
+#include <stdlib.h>
+void *malloc(size_t size);
+void free(void*ptr);
+```
+C语言中使用`malloc`申请内存，使用`free`释放内存。但问题是需要自己来管理申请的内存什么时候释放。当申请内存的地方很多的时候管理起来就很麻烦。稍有不慎就会忘记释放造成内存泄漏。或者多次释放导致程序崩溃。
+
+### 手动管理内存MRC(Mannul Reference Counting)
+为了解决申请的内存不知道赋值给了几个引用的问题。发明了一种管理内存的方法之一，那就是引用计数方式的管理内存。具体点就是，每当一块申请的内存被引用的时候，对这块内存的引用计数就加1，当对这块内存解除引用的时候就将这块内存的引用计数减1。当引用计数为0时，就自动释放这块内存。Objective-C最开始的手动管理内存（MRC）就是如此。
+```
+  NSObject *obj = [[NSObject alloc] init];
+  NSObject *obj_1 = obj;
+  [obj retain];//内存引用计数+1
+  [obj release];//内存引用计数-1
+```
+相比于传统的`malloc`和`free`管理内存的方式。只有当我们知道所有对某块内存的引用都解除的时候我们才能调用free方法。引用计数则帮我们完成了`free`的时机，那就是当引用计数为0时，会自动释放掉内存。我们只需要在添加引用的时候使用`retain`增加引用计数。在解除引用的时候，使用`release`减少引用计数就可以了。
+
+但是什么时候引用计数需要加一，什么时候引用计数又要减一那。这就引出了对于内存管理的思考方式。
+* 自己生成的对象，自己所持有。
+* 非自己生成的对象，自己也能持有。
+* 不再需要自己持有的对象时需要释放
+* 非自己持有的对象无法释放。
+
+这里面有几个关键词**生成**，**持有**，**释放**
+#### 自己生成的对象，自己所持有
+什么样的对象是属于自己生成的对象并且默认自己持有。以一下名称开头的方法名意味着自己生成的对象自己持有:
+* alloc
+* new
+* copy
+* mutableCopy
+```
+id obj1 = [[NSObject alloc] init];//自己生成并持有对象
+id obj2 = [NSObject new];//自己生成并持有对象
+id obj3 = [obj1 copy];//自己生成并持有对象
+id obj4 = [obj1 mutableCopy];//自己生成并持有对象
+```
+按照约定，使用**alloc**,**new**,**copy**,**mutableCopy**定义的符合驼峰命名法的方法名也属于自己生成并持有对象。
+
+#### 非自己生成的对象，自己也能持有
+除了上述方法生成的对象是自己生成且持有的。其它获得对象的方法都是非自己生成的对象，且自己并没有持有，但是可以使用其它方法持有。比如**NSMutableArray**的**array**类方法。
+```
+id obj = [NSMutableArray array];//取得非自己生成，且不持有的对象
+[obj retain];//自己持有对象
+```
+#### 不再需要自己持有的对象时需要释放
+```
+id obj = [[NSObject alloc] init];//自己生成并持有对象
+[obj release];//不需要持有对象时，释放对象
+
+id obj1 = [NSMutableArray array];//取得非自己生成且不持有的对象
+[obj1 retain];//自己持有对象
+[obj1 release];//不需要持有时，释放对象
+```
+
+#### 非自己持有的对象无法释放
+```
+id obj = [[NSObject alloc] init];//取得自己生成并持有的对象
+[obj release];//释放对象，自己不再持有。
+[obj release];//不能在对自己不再持有的对象进行释放
+```
+**以上就是引用计数式内存管理的思考方法**
+
+#### autorelease
+说到Objective-C内存管理，就不能不提autorelease。顾名思义，autorelease就是自动释放。这看上去很像ARC。但实际上它更类似于C语言中自动变量（局部变量）的特性。
+C语言中的自动变量。
+```
+{
+  int a;
+}
+```
+变量a在超出大括号的变量作用域之后就被废弃，不可再访问。autorelease会像C语言的自动变量那样来对待对象实例。当超出其作用域时，对象实例的release方法被调用。另外，同C语言的自动变量不同的是，编程人员可以设定变量的作用域。
+autorelease的具体使用方法如下:
+1. 生成并持有NSAutoreleasePool对象。
+2. 调用已分配对象的autorelease实例方法。
+3. 废弃NSAutoreleasePool对象。
+![IMAGE](resources/7EA4E4C9F63699873E417E3E146CED93.jpg =688x354)
+NSAutoreleasePool对象的生存周期相当于C语言变量的作用域。对于所有调用过autorelease实例方法的对象，在废弃NSAutoreleasePool对象时，都将调用release实例方法。
+```
+NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+id obj = [[NSObject alloc] init];
+[obj autorelease];
+[pool drain];
+```
+上述代码中最后一行的`[pool drain];`等同于`[obj release];`
+在Cocoa框架中，相当于程序主循环的NSRunLoop或者在其它程序可运行的地方，对NSAutoreleasePool对象进行生成，持有和废弃处理。因此程序开发者不一定非得使用NSAutoreleasePool对象来进行开发工作。
+![IMAGE](resources/2EB0044FBCB2E094783D4FC36825C5A6.jpg =626x262)
+尽管如此，但在大量产生autorelease的对象时，只要不废弃NSAutoreleasePool对象，那么生成的对象就不能释放，因此有时会产生内存不足的现象。典型的例子是读入大量图像的同时改变其尺寸。在此情况下，有必要在适当的地方生成，持有或废弃NSAutoreleasePool对象。
+![IMAGE](resources/8EF7478BD50F5AA29AC0274CD80F0B17.jpg =407x190)
+类似于这种，大量的NSObject对象被添加到runloop生成的NSAutoreleasePool中。此时如果想尽快的进行对象的释放就可以修改为
+![IMAGE](resources/EC8023E518095B161B9FD64146FB95D1.jpg =393x212)
+**其实autorelease的本质就是进行延时的释放。**
+![IMAGE](resources/C91CA72F1C76305B833E4EAFD76736E0.jpg =780x182)
+
+### 自动管理内存ARC(Automatic Reference Counting)
+引用计数式内存管理的本质部分在ARC中并没有改变。就像自动引用计数这个名称表示的一样，ARC只是自动的帮我们处理引用计数的相关部分。
+引用计数式内存管理的4个思考方式就是思考ARC所引起的变化。
+* 自己生成的对象，自己所持有。
+* 非自己生成的对象，自己也能持有。
+* 不再需要自己持有的对象时需要释放
+* 非自己持有的对象无法释放
+这些思考方式在ARC有效时也是可行的。只是在源代码的记述方式上稍有不同。到底有什么不同，首先要理解ARC中追加所有权声明。
+
+#### 所有权修饰符
+* __strong修饰符
+* __weak修饰符
+* __unsafe_unretained修饰符
+* __autoreleasing修饰符
+
+#### __strong修饰符
+__strong修饰符是id类型和对象类型的默认所有权修饰符。
+也就是说`id obj = [[NSObject alloc] init]`这种没有明确指定所有权修饰符时，默认为__strong修饰符。上面的代码等价与`id __strong obj = [[NSObject alloc] init]`当包含作用域时,ARC有效的以下代码等价于
+**ARC有效**
+```
+{
+id __strong obj = [[NSObject alloc] init];
+}
+```
+**ARC无效**
+
+```
+{
+id __strong obj = [[NSObject alloc] init];
+[obj release];
+}
+```
+
+也就是说__strong修饰符表示对象的强引用。持有强引用的变量在超出其作用域时被废弃，随着强引用的失效，引用的对象会随之释放。__strong修饰符的变量不仅只在变量作用域中，在赋值上也能够正确的管理其对象的所有者。
+通过__strong修饰符，不必再次键入retain和release，完美的满足了引用计数式内存管理的思考方式:
+* 自己生成的对象，自己所持有
+* 非自己生成的对象，自己也能持有
+* 不再需要自己持有的对象时释放
+* 非自己持有的对象无法释放
+前两项**自己生成的对象，自己所持有**和**非自己生成的对象，自己也能持有**只需通过对带__strong修饰符的变量赋值便可达成。通过废弃带__strong修饰符的变量（变量作用域结束或是成员变量所属对象废弃）或者对变量赋值，都可以做到**不再需要自己持有的对象时释放**。最后一项**非自己持有的对象无法释放**，由于不再键入release,所以原本就不会执行。这些都满足于引用计数式内存管理的思考方式。因为id类型和对象类型的所有权修饰符默认为__strong修饰符，所以不需要写上__strong。使得ARC有效及简单的编程遵循了Objective-C内存管理的思考方式。
+
+#### __weak修饰符
+看起来好像通过__strong修饰符编译器能够完美的进行内存管理。但是遗憾的是，仅通过__strong修饰符是不能解决有些重大问题的。这个重大问题就是引用计数式内存管理必然会发生的循环引用问题。
+![IMAGE](resources/20460630C3BC430E474CA7963823B039.jpg =518x362)
+**objectA**和**objectB**两个互相强引用导致A和B都没法释放造成内存泄漏。实际上看到__strong修饰符就会意识到有strong就会有与之对应的weak。也就是说使用__weak修饰符可以避免循环引用。__weak修饰符与__strong修饰符相反，提供弱引用。弱应用不能持有对象实例。
+像这样的代码
+`id __weak obj = [[NSObject alloc] init];`
+变量obj附上了__weak修饰符。如果编译一下代码。编译器会发出警告。
+![IMAGE](resources/43E4387A1703F7BB2C4D35CA7CDE9680.jpg =752x113)
+此源代码将自己生成并持有的对象赋值给附有__weak修饰符的变量obj。即变量obj持有对持有对象的弱引用。因此，为了不以自己持有的状态来保存自己生成并持有的对象，生成的对象会立即被释放。编译器会对此给出警告。如果像下面这样，将对象赋值给附有__strong修饰符的变量之后，再赋值给附有__weak修饰符的变量，就不会发生警告了。
+```
+{
+id __strong obj0 = [[NSObject alloc] init];
+id __weak obj1 = obj0;
+}
+```
+因为带__weak修饰符的变量（即弱引用）不持有对象，所以可以避免互相强引用导致的循环引用。
+![IMAGE](resources/CDB0D331A34F43FCEA2640316A03D535.jpg =536x399)
+__weak修饰符还有另一优点。在持有某对象的弱引用时，若该对象被废弃，则此弱引用将自动失效且处于nil被赋值的状态。
+
+#### __unsafe_unretained修饰符
+__unsafe_unretained相对于__weak修饰的区别就是__unsafe_unretained修饰的变量，当其引用的对象被废弃时，此弱引用不会被赋值为nil。还是指向原来的地址。进行访问的话相当于访问了已经被废弃的对象。可能会导致崩溃。
+
+#### __autoreleasing修饰符
+ARC有效时，虽然不能使用autorelease方法。也不能使用NSAutoreleasePool类。但实际上ARC有效时autorelease功能是起作用的。可以写成下面这样:
+```
+@autoreleasepool{
+  id __autoreleasing obj = [[NSObject alloc] init];
+}
+```
+指定**@autoreleasepool**块来替代NSAutoreleasePool类的对象生成，持有及废弃这一范围。
+![IMAGE](resources/CF2576AFEF86E668CAA98F7D966C0E56.jpg =861x375)
+但是显式的附加__autoreleasing修饰符同显式的附加__strong修饰符一样罕见。这是因为在使用alloc/new/copy/mutableCopy以外的方法来取得的对象，该对象已被注册到autoreleasepool。这同在ARC无效时取得调用了autorelease方法的对象是一样的。这是由于编译器会检查方法名是否以alloc/new/copy/mutalbeCopy开始。如果不是则自动将返回值的对象注册到autoreleasepool。
+
+#### 属性声明和修饰符的关系
+![IMAGE](resources/1BE0CCE719BD81C80154BE40DD32DF50.jpg =573x232)
+
+实际上ARC的实现就是编译器根据修饰符，在合适的位置自动添加了retain，release,autorelease方法。来实现自动管理内存的。
+
+### 扩展问题
+#### 引用计数是怎么存储的
+**获取引用计数的方法**
+![IMAGE](resources/3F9EF7F92F9F95DF6EF8019ED6AB5ED6.jpg =645x341)
+可以看到获取对象的引用计数就2步。（我们选择最繁琐的步骤）
+1.判断是不是仅仅是指针，如果不仅仅是指针，则获取类结构中的**extra_rc**。
+2.判断有没有额外的sidetable存储引用计数。如果有则通过sidetable取出额外的引用计数。
+**获取sidetable中的引用计数值**
+![IMAGE](resources/907291104E7867A255D226E7CD4872DF.jpg =554x156)
+**SideTables**
+![IMAGE](resources/EEC091CFA657EFDA28BA2391BEA03D0C.jpg =561x101)
+**StripeMap**
+![IMAGE](resources/52BD10102C76DBAF5F006333C460F2B6.jpg =587x320)
+可以看到在真机是是有8个sidetable。而在模拟器上或mac上是64个sidetable
+**SideTable**
+![IMAGE](resources/E835BF5AEC33E857F3848841C03E53B2.jpg =690x407)
+sidetable中包含一个锁，一个引用计数表，一个弱引用表。
+
+
+#### weak是怎么实现自动设置为nil的
+![IMAGE](resources/FF7A8A8B812CAA6F3C53C14840F57D49.jpg =826x1449)
+1.判断弱引用之前有没有指向旧值。如果指向的有旧值，则将旧值的弱引用表中的当前weak指针设置为nil.
+2.将新的弱引用指向的关系存储到weak_table_t中。
+
+每个sidetable中都包含了一个弱引用表weak_table;
+**weak_table_t**
+![IMAGE](resources/AB711E9EC33EB03D903FE72FCB698E0A.jpg =382x116)
+weak_table_t中又包含weak_entry_t数组。
+**weak_entry_t**
+![IMAGE](resources/E835EDE886E4147D57204D0E575D2C21.jpg =698x564)
+weak_entry_t中则存储的是对象和弱引用指针地址。
+
+
+#### 对象释放的时候具体做了什么
+![IMAGE](resources/3FB586258EA578D964B843F3EFEAC321.jpg =642x312)
+可以看到对象释放时主要做了以下几步
+1.看是否有弱引用过，如果有则清除弱引用
+2.看是否有关联对象，如果有则清除关联对象
+3.看是否有c++的析构方法，如果有则调用c++的析构方法
+4.看是否有引用计数表的额外存储，如果有则删除引用计数表中的存储。

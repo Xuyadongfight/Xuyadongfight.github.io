@@ -1,0 +1,71 @@
+可截获变量的匿名函数。
+
+# 1.最简单的不截获任何变量的block
+## 原始定义
+![IMAGE](resources/0EF13FC3133027FEE48E2ABC06DBEC81.jpg =777x114)
+## c++重写
+![IMAGE](resources/F3C670D32925BC21D4CFDF537C7D25BE.jpg =1033x96)
+![IMAGE](resources/B1D922DE7F2B2133B93337FCDF1BC93E.jpg =647x394)
+1.block转化为了一个静态方法main_block_func_0,参数为一个main_block_impl_0类型的结构体指针。
+main_block_impl_0结构体中包含block_impl和main_block_desc_0两个结构体
+结构体block_impl主要内容是一个void*isa指针和一个void*funcPtr指针。
+isa指向block的类型。即是栈,堆或者是全局block。
+funcptr指向main_block_func_0静态方法。
+结构体main_block_desc_0主要内容是block的大小。
+# 2.截获变量但不修改的block
+## 原始定义
+![IMAGE](resources/494472EA88E817A6366620AADC208AD9.jpg =655x155)
+## c++重写
+![IMAGE](resources/F3C670D32925BC21D4CFDF537C7D25BE.jpg =1033x96)
+![IMAGE](resources/06EBA91816A58CFAC34FD21FAD595D51.jpg =717x546)
+# 3.截获变量并修改的block
+## 原始定义
+![IMAGE](resources/42693E4DB650C47FA05EA8500CC3A6A7.jpg =689x171)
+## c++重写
+![IMAGE](resources/F3C670D32925BC21D4CFDF537C7D25BE.jpg =1033x96)
+![iShot_2022-12-14_11.03.41.png](resources/E7E372908450973E531C555F2E872954.png =1417x954)
+
+1.最简单的申明一个打印hello block字符串的block在main方法里面。并且声明后直接调用。通过clang -rewrite-objc 重写为c++文件。
+
+2.既然是匿名函数。函数得有函数体以及参数。函数体是什么。可以在c++文件中看到一个静态函数。static void main_block_func_0.参数为结构体 main_block_impl_0 *self
+而block_impl的结构体结构是什么那 可以看到第一个是block_impl。第二个是main_block_desc.
+分开看。
+block_impl的结构为 void *ias指针 int flags,int reserved, void*funcptr; 
+其中这个isa就是指向栈block还是堆block或者全局block
+
+
+main_block_desc_0的结构为一个unsigned long reserved;unsigned long block_size.
+
+
+方法的调用肯定是使用main_block_impl_0里面的方法指针调用。并且传入自身的指针地址。这就是最简单的block调用。没有使用外部变量。
+
+3.截获自动变量值的block 比如截获了局部变量int count;
+还是生成了一个静态方法 main_block_func_0.参数还是一个执行main_block_impl_0类型的机构体指针。只不过此时的main_block_impl_0结构体类型变为了 第一个参数还是结构体block_impl 第二个参数也不变还是main_block_desc_0.还多了一个截获的int count.
+
+4.修改截获的自动变量值。比如在block调用者修改int count的值。需要使用__block参数.这是怎么实现的那。
+1.首先可以将int count.改为静态变量或者全局变量 这肯定是不符合使用习惯的
+2.使用__block修饰
+。
+那么这两种有什么区别。
+第一种，修改为静态或全局的变量。
+可以看到main_block_impl_0的结构中对全局变量和全局静态变量的修改是会直接修改的 因为能够直接访问到。而对静态局部变量则是在main_block_impl_0中截获了静态局部变量的指针。在修改的时候，使用指针进行修改。
+
+第二种 使用__block修饰的局部变量。
+可以看到对局部变量的声明变为了一个block_var_0的结构体。这个结构体的结构为 void *ias,一个block_var_0类型指针的fowarding,int flags,int size,int cout.
+而main_block_impl_0也增加了一个block_byref_varl_0的结构体指针。而block_desc也多了两个方法，一个是copy,一个是dispose.copy的参数是block_impl_0 指针,block_impl_0 指针. dispose的参数也是一个block_impl_0 指针.
+
+对于这个block_byref_val_0结构体主要要注意的是为什么会有一个指向自身的fowarding指针。并且实际调用的时候。是通过调用自身的fowarding指针，来修改val的值。
+还有就是结构体的定义为什会定义在方法外面，主要是为了定义__block变量的时候在多个block中使用。
+
+## block超出变量作用域可以存在的原因。
+blocks提供了将block和block变量从栈上复制到堆上的方法来解决这个问题。这样即是block的语法记述的作用域结束。堆上的block还可以继续存在。
+复制到堆上的block将isa设为nsconcretemallocblock;而block变量的结构体成员变量forwarding变量能够实现无论在栈上还是堆上都能够正确的访问block变量。
+
+## block变量用结构体成员变量为什么会有指向自身的fowarding.
+fowarding是当是栈上的block变量是指向自身，当block变量随着block从栈上复制到堆上时候，将fowarding指向堆上的block变量。
+
+## 什么时候栈上的block会复制到堆上。
+1.调用block copy方法时
+2.block作为函数返回值的时候
+3.将block赋值给用strong修饰的id类型的变量时
+4.使用GCD api中的block的时候。
