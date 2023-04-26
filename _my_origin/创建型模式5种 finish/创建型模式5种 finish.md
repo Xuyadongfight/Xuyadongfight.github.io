@@ -1,0 +1,423 @@
+## 5种:
+单例模式;原型模式;建造者模式;工厂模式;抽象工厂模式;
+
+## 思路
+单个对象的创建:单例模式，原型模式，建造者模式
+多个对象的创建:工厂模式，抽象工厂模式
+
+## 单例模式
+某个类只有一个实例，且自行实例化，并向整个系统提供此实例。
+创建方式分为懒汉式和饿汉式。推荐饿汉式创建单例。所谓的懒汉式创建其实就是懒加载，只有当使用到单例的时候在创建。而饿汉式创建则是程序启动之后就直接创建单例。
+
+### Code
+### 饿汉式创建（推荐）
+```
+// 饿汉式创建
+class SingleTonPattern{
+    static let _share = SingleTonPattern()
+    public class func shared()->(SingleTonPattern){
+        return _share
+    }
+}
+```
+### 懒汉式创建
+#### version-1
+```
+// 懒汉式创建 version-1高并发多线程环境下可能存在问题
+class SingleTonPattern{
+    static var _share : SingleTonPattern?
+    public class func shared()->(SingleTonPattern){
+        if _share == nil {//高并发多线程环境下，这里可能存在创建单例的过程中，下一个线程判断此处还是空
+            _share = SingleTonPattern()
+        }
+        return _share ?? SingleTonPattern()
+    }
+}
+```
+#### version-2
+```
+// 懒汉式创建 version-2加锁解决高并发多线程的问题（但每次使用时都需要加锁解锁，影响性能）
+class SingleTonPattern{
+    static var _share : SingleTonPattern?
+    static let lock = NSLock()
+    public class func shared()->(SingleTonPattern){
+        lock.lock()//加锁解决了多线程的互斥访问，但是每次使用单例都要进行加锁解锁影响性能
+        if _share == nil {
+            _share = SingleTonPattern()
+        }
+        lock.unlock()
+        return _share ?? SingleTonPattern()
+    }
+}
+```
+#### version-3（最终版）
+```
+// 懒汉式创建 version-3双if判断解决频繁加锁解锁的问题
+class SingleTonPattern{
+    static var _share : SingleTonPattern?
+    static let lock = NSLock()
+    public class func shared()->(SingleTonPattern){
+        if _share == nil{//优化双层if只有第一次为空时候会加锁进行互斥访问。
+            lock.lock()
+            if _share == nil {
+                _share = SingleTonPattern()
+            }
+            lock.unlock()
+        }
+        return _share ?? SingleTonPattern()
+    }
+}
+```
+### 单例模式总结
+推荐使用饿汉式创建单例。但也不是绝对，如果一个单例的创建开销太大影响到了程序启动等。可以采用懒汉式模式创建，即使用单例的时候再创建。
+* **单例模式的优点:**
+1. 由于单例模式在内存中只有一个实例，减少了内存开支，特别是一个对象需要频繁地创建、销毁时，而且创建或销毁时性能又无法优化，单例模式的优势就非常明显。
+2. 由于单例模式只生成一个实例，所以减少了系统的性能开销，当一个对象的产生需要比较多的资源时，如读取配置、产生其他依赖对象时，则可以通过在应用启动时直接产生一 个单例对象，然后用永久驻留内存的方式来解决。
+3. 单例模式可以避免对资源的多重占用，例如一个写文件动作，由于只有一个实例存在 内存中，避免对同一个资源文件的同时写操作。
+4. 单例模式可以在系统设置全局的访问点，优化和共享资源访问，例如可以设计一个单 例类，负责所有数据表的映射处理。
+
+* **单例模式的缺点:**
+1. 单例模式一般没有接口，扩展很困难，若要扩展，除了修改代码基本上没有第二种途径可以实现。单例模式为什么不能增加接口呢？因为接口对单例模式是没有任何意义的，它 要求“自行实例化”，并且提供单一实例、接口或抽象类是不可能被实例化的。当然，在特殊 情况下，单例模式可以实现接口、被继承等，需要在系统开发中根据环境判断。
+2. 单例模式对测试是不利的。在并行开发环境中，如果单例模式没有完成，是不能进行测试的，没有接口也不能使用mock的方式虚拟一个对象。
+3. 单例模式与单一职责原则有冲突。一个类应该只实现一个逻辑，而不关心它是否是单例的，是不是要单例取决于环境，单例模式把“要单例”和业务逻辑融合在一个类中。
+
+
+## 原型模式
+指定使用原型实例创建的对象类型，并通过复制该原型创建新对象。其实就是通过复制一个已经存在的实例来返回新的实例,而不是新建实例。
+原型模式是指在保持性能的同时创建重复的对象。这种类型的设计模式属于创建模式，因为这种模式提供了创建对象的最佳方式之一。
+此模式涉及实现一个原型接口，该接口告诉创建当前对象的克隆。当直接创建对象的开销很大时，使用此模式。例如，在一个代价高昂的数据库操作之后要创建一个对象。我们可以缓存对象，在下一次请求时返回它的克隆，并在需要时更新数据库，从而减少数据库调用。
+
+### Code
+
+```
+class PrototypePattern{
+    var x : Int = 16
+    init() {
+        //模仿初始化时候需要的耗时操作
+        sleep(1)
+    }
+    func copy() -> PrototypePattern {
+        let pointer_self = Unmanaged.passUnretained(self).toOpaque()
+        
+        let pointer_new = UnsafeMutableRawPointer.allocate(byteCount: 32, alignment: 8)
+        pointer_new.copyMemory(from: pointer_self, byteCount: 32)
+        
+        let unmanaged = Unmanaged<PrototypePattern>.fromOpaque(pointer_new)
+        let managedValue = unmanaged.takeRetainedValue()
+        return managedValue
+    }
+    deinit {
+        print("deinit \(self) \(self.x)")
+    }
+}
+```
+正常对象的创建需要调用初始化方法。假如一个对象的创建比较耗时的话。可以通过原型模式。通过直接复制内存的模式创建新的对象。
+
+### 原型模式总结
+* **原型模式的优点:**
+1. 性能优良，原型模式是在内存二进制流的拷贝，要比直接new一个对象性能好很多，特别是要在一个循环体内产生大量对象时。
+2. 逃避构造函数的约束。直接在内存中拷贝，构造函数是不会执行的。
+
+* **原型模式的缺点:**
+1. 逃避构造函数即是优点也是缺点。有些类的构造函数可能存在一些其它的方法调用。那么原型模式因为不会调用构造函数，会导致这些方法不会调用
+2. 拷贝时候需要注意是浅拷贝还是深拷贝。简单点来讲就是对于引用对象是连对象一起拷贝还是仅仅拷贝引用。
+
+## 建造者（生成器）模式
+将一个复杂对象的构建与它的表示分离，使得同样的构建过程可以创建不同的表示。
+
+### Code
+```
+import Foundation
+
+class Car:CustomStringConvertible{
+    var brand : String
+    var engine : String
+    var seats : String
+    var computer : String
+    var wheels : String
+    var autopilot : String
+    
+    init() {
+        self.brand = ""
+        self.engine = ""
+        self.seats = ""
+        self.computer = ""
+        self.wheels = ""
+        self.autopilot = ""
+    }
+    
+    var description: String{
+        let mirror = Mirror.init(reflecting: self)
+        let str = mirror.children.map{"\($0.value)"}.filter{!$0.isEmpty}.joined(separator: ",")
+        return str
+    }
+}
+
+protocol Builder{
+    func setBrand(_ brand:String)
+    func setEngine(_ engine:String)
+    func setSeats(_ seats:String)
+    func setComputer(_ computer:String)
+    func setWheels(_ wheels:String)
+    func setAutopilot(_ autopilot:String)
+    func reset();
+    func getProduct()->Car
+    
+}
+
+class CarBuilder:Builder{
+    private var car = Car()
+    
+    func setBrand(_ brand: String) {
+        self.car.brand = brand
+    }
+    func setEngine(_ engine: String) {
+        self.car.engine = engine
+    }
+    
+    func setSeats(_ seats: String) {
+        self.car.seats = seats
+    }
+    
+    func setComputer(_ computer: String) {
+        self.car.computer = computer
+    }
+    
+    func setWheels(_ wheels: String) {
+        self.car.wheels = wheels
+    }
+    
+    func setAutopilot(_ autopilot: String) {
+        self.car.autopilot = autopilot
+    }
+    
+    func reset() {
+        self.car = Car()
+    }
+    
+    func getProduct() -> Car {
+        return self.car
+    }
+}
+
+class Director{
+    class func constructBYDCar(builder:CarBuilder){
+        builder.reset()
+        builder.setBrand("比亚迪汽车")
+        builder.setEngine("DMI混动动力")
+        builder.setSeats("舒适座椅")
+        builder.setWheels("4轮")
+        builder.setComputer("14英寸电脑")
+        builder.setAutopilot("博世辅助驾驶")
+    }
+    
+    class func constructHuaWeiCar(builder:CarBuilder){
+        builder.reset()
+        builder.setBrand("华为汽车")
+        builder.setEngine("电动动力")
+        builder.setSeats("零重力座椅")
+        builder.setWheels("4轮")
+        builder.setComputer("14英寸电脑")
+        builder.setAutopilot("华为辅助驾驶")
+    }
+    
+    class func constructOldCar(builder:CarBuilder){
+        builder.reset()
+        builder.setBrand("老式汽车")
+        builder.setEngine("蒸汽动力")
+        builder.setWheels("4轮")
+    }
+}
+
+
+
+class BuilderPattern{
+    class func start(){
+        let builder = CarBuilder()
+        
+        Director.constructBYDCar(builder: builder)
+        let carBYD = builder.getProduct()
+        
+        Director.constructHuaWeiCar(builder: builder)
+        let carHW = builder.getProduct()
+        
+        Director.constructOldCar(builder: builder)
+        let carOld = builder.getProduct()
+        print(carBYD)
+        print(carHW)
+        print(carOld)
+    }
+}
+```
+
+### 建造者（生成器）模式总结
+* **建造者模式的优点:**
+1. 封装性。使用建造者模式可以使客户端不必知道产品内部组成的细节。
+2. 易扩展。汽车的几种品牌是相互独立的，对系统的扩展非常有利
+3. 便于控制细节风险。由于具体的建造者是独立的，因此可以对建造过程逐步细化，而不对其它模块产生任何影响。
+
+* **建造者模式的缺点:**
+1. 代码量增加了。
+2. 对象的创建稍微变的负责了。
+
+
+
+## 工厂模式
+定义一个用于创建对象的接口，让子类决定实例化哪一个类。工厂方法使一个类的实例化延迟到其子类。
+
+### Code
+```
+import Foundation
+
+protocol Phone{
+    init()
+    func phoneCall(number:String)
+    func phoneAnswer()
+}
+
+class PhoneIphone : Phone{
+    required init(){}
+    func phoneCall(number:String) {
+        print("苹果手机拨打电话:\(number)")
+    }
+    func phoneAnswer() {
+        print("苹果手机接电话")
+    }
+}
+
+class PhoneAndroid : Phone{
+    required init(){}
+    func phoneCall(number:String) {
+        print("安卓手机拨打电话:\(number)")
+    }
+    func phoneAnswer() {
+        print("安卓手机接电话")
+    }
+}
+
+class PhoneFactory {
+    @discardableResult
+    class func createPhone<T:Phone>(phoneType:T.Type)->Phone{
+        let phone = phoneType.init()
+        return phone
+    }
+    class func testPhone(phone:Phone){
+        phone.phoneCall(number: "110")
+        phone.phoneAnswer()
+    }
+}
+
+class FactoryPattern{
+    class func start(){
+       let phone1 = PhoneFactory.createPhone(phoneType: PhoneIphone.self)
+       let phone2 = PhoneFactory.createPhone(phoneType: PhoneAndroid.self)
+        PhoneFactory.testPhone(phone: phone1)
+        PhoneFactory.testPhone(phone: phone2)
+    }
+}
+```
+
+### 工厂模式总结
+根据一种产品类创建实例是不需要工厂模式的。根据两种产品类创建两种产品实例其实也是不需要工厂模式的。比如根据苹果手机类创建一个苹果手机实例。根据一个汽车类创造一个汽车实例。为什么不需要工厂模式。因为这两种类直接还没有产生共同的联系。可能一般的工厂类的处理。比如一个苹果手机类，一个安卓手机类。当我们需要手机的时候，这个手机可以打电话和接电话。于是它俩产生了共同的联系。打电话和接电话就可以作为他们共同联系的接口。而我们事件需要的仅仅是能够打电话和接电话的手机。我们不需要知道他们是苹果手机还是安卓手机，因为他们只要能打电话和接电话即可。于是我们可以设计一个手机类实现打电话和接电话。然后苹果手机类和安卓手机类继承自手机类。但是这个就对代码的侵入很大。联想到6大原则的依赖倒置原则以及迪米特法则。与其将打电话和接电话作为手机类设计，不如将其设计为手机功能接口。同时为了符号迪米特法则。我们只需要知道最低限度的功能即可。也就是我们只需要打电话和接电话的功能。那么我们接口的设计也只涉及知道打电话和接电话，而不是具体的是苹果手机还是安卓手机。于是就抽象出来了一个手机功能接口。安卓手机和苹果手机实现这个接口的功能即可。使用的时候我们需要创建的是一个拥有手机通话功能的实例。于是定义一个工厂类来完成这个实例的创建。
+
+* **工厂模式的优点:**
+1. 可以避免创建者和具体产品之间的紧密联系
+2. 单一职责原则。可以将产品创建代码放在程序的单一位置，从而使得代码更容易维护
+3. 开闭原则。无需更改现有客户端的代码，就可以在程序中引入新的产品类型
+
+* **工厂模式的缺点:**
+1. 应用工厂模式需要引入许多新的子类，代码可能会变的更复杂。最好的情况是将该模式引入创建者类的现有层次机构中。
+
+
+## 抽象工厂模式
+为创建一组相关或相互依赖的对象提供一个接口，而且无须指定它们的具体类。
+
+### Code
+```
+import Foundation
+
+protocol DefaultInit{
+    init()
+}
+
+protocol Phone:DefaultInit{
+    func phoneCall(number:String)
+    func phoneAnswer()
+}
+
+protocol PhoneFactory:DefaultInit{
+    func createPhone<T:Phone>(phoneType:T.Type)->Phone
+    func testPhone(phone:Phone)
+}
+
+final class PhoneIphone : Phone{
+
+    func phoneCall(number:String) {
+        print("苹果手机拨打电话:\(number)")
+    }
+    func phoneAnswer() {
+        print("苹果手机接电话")
+    }
+}
+
+final class PhoneAndroid : Phone{
+
+    func phoneCall(number:String) {
+        print("安卓手机拨打电话:\(number)")
+    }
+    func phoneAnswer() {
+        print("安卓手机接电话")
+    }
+}
+
+final class ChinaPhoneFactory : PhoneFactory {
+    @discardableResult
+    func createPhone<T:Phone>(phoneType:T.Type)->Phone{
+        print("中国工厂生产")
+        let phone = phoneType.init()
+        return phone
+    }
+    func testPhone(phone:Phone){
+        print("中国工厂测试")
+        phone.phoneCall(number: "110")
+        phone.phoneAnswer()
+    }
+}
+
+final class IndianPhoneFactory : PhoneFactory {
+    @discardableResult
+    func createPhone<T:Phone>(phoneType:T.Type)->Phone{
+        print("印度工厂生产")
+        let phone = phoneType.init()
+        return phone
+    }
+    func testPhone(phone:Phone){
+        print("印度工厂测试")
+        phone.phoneCall(number: "110")
+        phone.phoneAnswer()
+    }
+}
+
+
+class AbstractFactoryPattern{
+    class func start(){
+        let facotry : PhoneFactory = IndianPhoneFactory()
+        let phone = facotry.createPhone(phoneType: PhoneAndroid.self)
+        facotry.testPhone(phone: phone)
+    }
+}
+```
+
+### 抽象工厂模式总结
+
+* **抽象工厂模式优点:**
+1. 可以确保同一工厂生产的产品相互匹配
+2. 可以避免客户端和具体产品代码的耦合
+3. 单一职责原则。可以将产品的生产代码抽取到同一个位置，使得代码容易维护
+4. 开闭原则。向应用程序中引入新产品变体时，无需修改客户端代码
+
+* **抽象工厂模式缺点:**
+1. 由于采用该模式需要想应用中引入众多的接口和类，代码可能比之前更加复杂
+
+## 引用
+**1.** https://www.tutorialspoint.com/design_pattern/prototype_pattern.htm
