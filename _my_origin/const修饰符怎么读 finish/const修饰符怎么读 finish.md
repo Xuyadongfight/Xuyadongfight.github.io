@@ -1,0 +1,47 @@
+## 例子
+```
+void testFuncConst(){
+    const int a1 = 0;
+    int const a2 = 0;
+    
+    const int* b1 = 0;
+    int const * b2 = 0;
+    int * const b3 = 0;
+    
+    const int ** c1 = 0;
+    int const ** c2 = 0;
+    int * const * c3 = 0;
+    int ** const c4 = 0;
+}
+```
+
+## 怎么读
+其实很简单，就是const到变量之间作为一个整体，然后拿掉const，则剩下的部分就不可以再被修改了。而类型可以直接不看。因为const修饰的是可变还是不可变的。和类型没什么关系。但要注意的是拿掉的只能是类型，不能包含指针符号。因为我们不能将一个本来指针类型变成一个非指针类型。同时要看const修饰的什么类型，只要将拿掉的类型放到const最左边即可。
+
+## 变量a系列
+对于变量a1。我们将类型int拿出来放到const最左边变为`int const a1 = 0`。发现和变量a2的定义没区别。然后将const到变量之间作为一个整体，`const a1`，在去掉const，就只剩下一个变量`a1`，发现const修饰的就是a1。而a1是什么类型那？看看const的左边部分是int。于是`const int a1 = 0;`其实就是一个不可变的int类型变量a1。a2的定义同a1。故对于a1和a2都不可以再进行`a1 = 3`和`a2 = 3`重新赋值。
+
+## 变量b系列
+
+### 对于变量b1
+采用刚刚的方法，将类型取出并放在const修饰符的最左边。变为`int const * b1 = 0;`发现const右边是`*b1`。故`*b1`不能再被修改。而`*b1`的类型是const的左边int类型。
+
+### 对于变量b2
+变量b2同变量b1一样。
+
+### 对于变量b3
+变量b3。类型int本来就在const最左侧。不需要改写直接读即可。`int * const b3 = 0;`可以看到const右边为b3。故b3不可再更改。而这个不可更改的类型为const的左侧`int *`。
+
+## 变量c系列
+
+### 对于变量c1
+同样将类型int拿到const最左边改为`int const ** c1 = 0;`，const右边即是所修饰的内容，即`**c1`不可更改。它的类型为const左边的内容int。
+
+### 对于变量c2
+变量c2同变量c1一样。
+
+### 对于变量c3
+类型int已经在const最左边。故const右边部分`*c3`不可更改。它的类型是const左边部分`int *`。
+
+### 对于变量c4
+类型int已经在const最左边。故const右边部分`c4`不可更改。它的类型是const左边部分`int **`。
