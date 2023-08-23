@@ -1,0 +1,149 @@
+## KVO
+键值观察是一种机制，它允许在其他对象的指定属性发生变化时通知对象。
+
+## 注册键值观察
+* 使用`addObserver:forKeyPath:options:context:`方法向被观察对象注册观察者。
+* 在观察者内部实现`observeValueForKeyPath:ofObject:change:context:`来接受变更通知消息。
+* 当观察者不再应该接收消息时，使用`removeObserver:forKeyPath:`方法注销观察者。至少，在观察者从内存中释放之前调用这个方法。
+
+### 注册一个观察者
+观察对象首先通过发送`addObserver:forKeyPath:options:context:`消息将自己作为观察者和要观察的属性的关键路径传递给被观察对象，从而向被观察对象注册自己。观察者还指定了一个选项参数和一个上下文指针来管理通知的各个方面。
+
+#### 参数options
+1. NSKeyValueObservingOptionNew
+传递改变后的新值
+2. NSKeyValueObservingOptionOld
+传递改变前的值
+3. NSKeyValueObservingOptionInitial
+在观察者注册方法返回之前立即将通知发送给观察者
+4. NSKeyValueObservingOptionPrior
+会在变化前后分别调用一次，共两次，变化前的通知参数包含`notificationIsPrior = 1`
+
+#### 参数Context
+用来传递给观察者的任意数据。一般用来确定通知的来源。
+
+* **注意:注册方法不维护被观察者、观察者或上下文的强引用。你应该确保在必要时维护对观察者和被观察者以及上下文的强引用。**
+ 
+
+### 接收改变的通知
+当一个对象的观察属性的值发生变化时，观察者会收到一个observeValueForKeyPath:ofObject:change:context:消息。所有观察者都必须实现这个方法。
+观察对象提供触发通知的键路径、作为相关对象的本身、包含更改详细信息的字典，以及在为该键路径注册观察者时提供的上下文指针。
+ 
+
+### 移除作为观察者的对象
+通过向被观察对象发送removeObserver:forKeyPath:context:消息，指定观察对象、键路径和上下文，可以删除键值观察者。
+在移除观察者后，观察者将不会再收到被观察者和指定路径的任何消息。
+
+移除观察者时要注意以下几点:
+1. 如果还没有添加观察者，则移除观察者会抛出异常。
+2. 一个观察者不会再自己释放之后主动移除自己。
+3. 协议没有提供询问对象是观察者还是被观察者的方法。需要自己构造代码避免错误。通常是在观察者初始化或者`viewDidLoad`中注册观察者，并在`dealloc`中取消注册。确保正确配对和有序的添加和删除消息，即先添加注册再移除注册。并且添加和移除要成对。
+
+## KVO的要求
+符合KVO的属性，类应该遵循以下内容:
+1. 类的属性必须符合KVC
+2. 类为属性发出KVO更改的通知。
+3. 相关的键已经注册
+
+有两种技术可以确保发出更改通知。自动支持的由NSObject提供，默认情况下可用于类的所有属性，这些属性是键值编码兼容的。通常，如果遵循标准的Cocoa编码和命名约定，就可以使用自动更改通知—不必编写任何额外的代码。
+手动更改通知提供了对何时发出通知的额外控制，并且需要额外的编码。你可以通过实现类方法`automaticallyNotifiesObserversForKey`:来控制子类属性的自动通知。
+
+### 自动改变的通知
+NSObject提供了自动键值更改通知的基本实现。自动键值更改通知通知观察者使用符合键值的访问器以及键值编码方法所做的更改。由`mutableArrayValueForKey:`返回的集合代理对象也支持自动通知。
+
+### 手动改变的通知
+在某些情况下，你可能希望控制通知过程，例如，尽量减少因应用程序特定原因而不必要触发的通知，或者将许多更改分组到单个通知中。手动更改通知提供了执行此操作的方法。
+手动通知和自动通知并不相互排斥。除了已经存在的自动通知之外，你还可以自由地发出手动通知。更典型的情况是，你可能希望完全控制特定属性的通知。在这种情况下你覆盖NSObject实现的`automaticallyNotifiesObserversForKey:`方法。对于那些你想要阻止自动通知的属性你返回NO。对其它的属性调用super的实现。
+![IMAGE](resources/E56D0476027FA7E867E6BF2726A58C10.jpg =775x311)
+要实现手动观察者通知，在更改值之前调用`willChangeValueForKey:`，在更改值之后调用`didChangeValueForKey:`
+![IMAGE](resources/A00FE58E875370908BCCD75A84A374C2.jpg =627x163)
+你可以通过首先检查该值是否已更改来最小化发送不必要的通知。
+![IMAGE](resources/01F4FB049A2E23475C69FDD60559743C.jpg =638x214)
+如果单个操作导致多个键更改，则必须嵌套更改通知。
+![IMAGE](resources/0D04CF875FC45335945B3843CB1329C3.jpg =536x232)
+在一对多关系的情况下，你不仅必须指定更改的键，还必须指定更改的类型和所涉及对象的索引。变化类型为NSKeyValueChange，指定NSKeyValueChangeInsertion、NSKeyValueChangeRemoval或NSKeyValueChangeReplacement。受影响对象的索引作为NSIndexSet对象传递。
+![IMAGE](resources/D44B18EBD89CDF19837D30911AD8CB01.jpg =665x250)
+
+## 注册依赖建
+在许多情况下，一个属性的值取决于另一个对象中的一个或多个其他属性的值。如果一个属性的值发生了变化，那么派生属性的值也应该被标记为变化。如何确保为这些依赖属性发布键值观察通知取决于关系的数量。
+
+### 一对一关系
+要自动触发一对一关系的通知，你应该重写keyPathsForValuesAffectingValueForKey:或者实现一个合适的方法，该方法遵循它为注册依赖键定义的模式。
+例如，一个人的全名依赖于他的姓和名。返回全名的方法可以写成如下:
+```
+- (NSString *)fullName {
+    return [NSString stringWithFormat:@"%@ %@",firstName, lastName];
+}
+```
+当firstName或lastName属性发生变化时，必须通知观察fullName属性的应用程序，因为它们会影响属性的值。
+一种解决方案是重写`keyPathsForValuesAffectingValueForKey:`指定一个人的fullName属性依赖于lastName和firstName属性。
+```
++ (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key {
+ 
+    NSSet *keyPaths = [super keyPathsForValuesAffectingValueForKey:key];
+ 
+    if ([key isEqualToString:@"fullName"]) {
+        NSArray *affectingKeys = @[@"lastName", @"firstName"];
+        keyPaths = [keyPaths setByAddingObjectsFromArray:affectingKeys];
+    }
+    return keyPaths;
+}
+```
+你的重写通常应该调用super并返回一个集合，其中包含由这样做产生的集合中的任何成员(以免干扰父类中对该方法的重写)。
+你也可以通过实现遵循命名约定`keyPathsForValuesAffecting<Key>`的类方法来实现相同的结果，其中<Key>依赖于值的属性的名称(首字母大写)。使用这种模式可以将上面的代码改为:
+```
++ (NSSet *)keyPathsForValuesAffectingFullName {
+    return [NSSet setWithObjects:@"lastName", @"firstName", nil];
+}
+```
+当你使用类别向现有类添加计算属性时，你不能重写`keyPathsForValuesAffectingValueForKey:` 方法，因为你不应该重写类别中的方法。在这种情况下，实现一个匹配的`keyPathsForValuesAffecting<Key> `类方法来利用此机制。
+ 
+**注意:你不能通过实现`keyPathsForValuesAffectingValueForKey`来建立对多关系的依赖。相反，你必须观察对多关系集合中每个对象的适当属性，并通过自己更新依赖键来响应其值的更改。**
+
+### 对多关系
+方法`keyPathsForValuesAffectingValueForKey`不支持包含多对多关系的键路径。例如，假设你有一个Department对象，它与Employee有多对多关系(员工)，而Employee有一个salary属性。你可能希望Department对象有一个totalSalary属性，该属性依赖于关系中所有employee的工资。例如，你不能使用keyPathsForValuesAffectingTotalSalary和返回employees.salary来作为键。有两种解决方法。
+
+**1. 你可以使用key-value observing将父节点(在本例中为Department)注册为所有子节点(在本例中为Employees)相关属性的观察者。当子对象被添加和从关系中删除时，必须添加和删除父对象作为观察者(参见注册键值观察)。在`observeValueForKeyPath:ofObject:change:context:`方法中，你更新依赖值以响应变化，如下面的代码片段所示:**
+
+```
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+ 
+    if (context == totalSalaryContext) {
+        [self updateTotalSalary];
+    }
+    else
+    // deal with other observations and/or invoke super...
+}
+ 
+- (void)updateTotalSalary {
+    [self setTotalSalary:[self valueForKeyPath:@"employees.@sum.salary"]];
+}
+ 
+- (void)setTotalSalary:(NSNumber *)newTotalSalary {
+ 
+    if (totalSalary != newTotalSalary) {
+        [self willChangeValueForKey:@"totalSalary"];
+        _totalSalary = newTotalSalary;
+        [self didChangeValueForKey:@"totalSalary"];
+    }
+}
+ 
+- (NSNumber *)totalSalary {
+    return _totalSalary;
+}
+```
+
+**2. 如果你使用Core Data，你可以在应用程序的通知中心注册父节点作为其托管对象上下文的观察者。父节点应该以类似于键值观察的方式响应子节点发布的相关更改通知。**
+
+## KVO实现细节
+自动键值观察是使用一种称为isa-swizzling的技术实现的。
+顾名思义，isa指针指向维护调度表的对象类。这个调度表本质上包含指向类实现的方法的指针，以及其他数据。
+当观察者注册一个对象的属性时，被观察对象的isa指针被修改，指向一个中间类，而不是真正的类。因此，isa指针的值不一定反映实例的实际类。
+永远不应该依赖isa指针来确定类的成员关系。相反，你应该使用类方法来确定对象实例的类。比如一个类`Person`实例作为被观察者时，其最终isa将被指向一个动态创建的`NSKVONotifying_Person`类。并且这个KVO通知类继承自`Person`。
+ 
+ 
+ 
+
+## 参考
+1. https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueObserving/KeyValueObserving.html#//apple_ref/doc/uid/10000177i
+2. https://draveness.me/kvocontroller/
